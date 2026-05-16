@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { motion } from "framer-motion";
+import { useAccount } from "wagmi";
 import {
   Shield,
   Building2,
@@ -13,6 +14,7 @@ import {
   AlertTriangle,
   Wallet,
   Info,
+  Lock,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -21,8 +23,14 @@ import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { mockPendingCampaigns } from "@/data/mockData";
 import { formatDate } from "@/lib/utils";
+import { WalletConnect } from "@/components/web3/WalletConnect";
+
+const ADMIN_WALLET = process.env.NEXT_PUBLIC_ADMIN_WALLET?.toLowerCase();
 
 export default function AdminPage() {
+  const { address, isConnected } = useAccount();
+  const isAdmin = isConnected && address?.toLowerCase() === ADMIN_WALLET;
+
   const [pendingCampaigns, setPendingCampaigns] = useState(mockPendingCampaigns);
   const [verifiedOrganizations, setVerifiedOrganizations] = useState<string[]>([]);
   const [walletInput, setWalletInput] = useState("");
@@ -30,7 +38,6 @@ export default function AdminPage() {
 
   const handleVerifyCampaign = async (campaignId: string) => {
     setActionInProgress(campaignId);
-    // TODO: Connect to contract verifyCampaign(campaignId)
     setTimeout(() => {
       setPendingCampaigns((prev) => prev.filter((c) => c.id !== campaignId));
       setActionInProgress(null);
@@ -39,7 +46,6 @@ export default function AdminPage() {
 
   const handleRejectCampaign = async (campaignId: string) => {
     setActionInProgress(campaignId);
-    // TODO: Connect to contract rejectCampaign(campaignId)
     setTimeout(() => {
       setPendingCampaigns((prev) => prev.filter((c) => c.id !== campaignId));
       setActionInProgress(null);
@@ -49,13 +55,56 @@ export default function AdminPage() {
   const handleVerifyOrganization = async () => {
     if (!walletInput.trim()) return;
     setActionInProgress("org_verify");
-    // TODO: Connect to contract verifyOrganization(address)
     setTimeout(() => {
       setVerifiedOrganizations((prev) => [...prev, walletInput]);
       setWalletInput("");
       setActionInProgress(null);
     }, 1500);
   };
+
+  if (!isConnected) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="text-center max-w-md mx-auto p-8"
+        >
+          <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-6">
+            <Lock className="h-8 w-8 text-primary" />
+          </div>
+          <h1 className="text-2xl font-bold mb-3">Yönetim Paneli</h1>
+          <p className="text-muted-foreground mb-6">
+            Bu sayfaya erişmek için yönetici cüzdanınızı bağlamanız gerekmektedir.
+          </p>
+          <WalletConnect />
+        </motion.div>
+      </div>
+    );
+  }
+
+  if (!isAdmin) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="text-center max-w-md mx-auto p-8"
+        >
+          <div className="w-16 h-16 rounded-2xl bg-destructive/10 flex items-center justify-center mx-auto mb-6">
+            <Shield className="h-8 w-8 text-destructive" />
+          </div>
+          <h1 className="text-2xl font-bold mb-3">Erişim Reddedildi</h1>
+          <p className="text-muted-foreground mb-4">
+            Bu sayfa yalnızca yönetici cüzdanı ile erişilebilir.
+          </p>
+          <p className="text-xs font-mono text-muted-foreground bg-secondary/30 rounded-lg p-3 break-all">
+            Bağlı cüzdan: {address}
+          </p>
+        </motion.div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen">
@@ -251,16 +300,16 @@ export default function AdminPage() {
                         Doğrulanmış Kurumlar
                       </p>
                       <div className="space-y-2">
-                        {verifiedOrganizations.map((address) => (
+                        {verifiedOrganizations.map((addr) => (
                           <div
-                            key={address}
+                            key={addr}
                             className="flex items-center justify-between p-3 rounded-lg bg-success/10 border border-success/20"
                           >
                             <div className="flex items-center gap-3">
                               <div className="p-2 rounded-lg bg-success/20">
                                 <Wallet className="h-4 w-4 text-success" />
                               </div>
-                              <span className="font-mono text-sm">{address}</span>
+                              <span className="font-mono text-sm">{addr}</span>
                             </div>
                             <Badge variant="success" className="gap-1">
                               <CheckCircle className="h-3 w-3" />

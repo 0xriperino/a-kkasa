@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
 import { AlertTriangle, Zap, Wallet } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -16,22 +16,29 @@ import {
   ACIKKASA_VAULT_ADDRESS,
   ACIKKASA_VAULT_ABI,
 } from "@/lib/contracts";
+import { supabase } from "@/../lib/supabase/client";
 
 interface DonationPanelProps {
   targetMUSDC: number;
   collectedMUSDC: number;
   campaignId?: number;
+  campaignDbId?: string;
+  onDonationSuccess?: () => void;
 }
 
 export function DonationPanel({
   targetMUSDC,
   collectedMUSDC,
   campaignId = 0,
+  campaignDbId,
+  onDonationSuccess,
 }: DonationPanelProps) {
-  const { isConnected } = useAccount();
+  const { isConnected, address } = useAccount();
   const [monAmount, setMonAmount] = useState("");
   const [musdcAmount, setMusdcAmount] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [step, setStep] = useState<"idle" | "approving" | "donating-musdc" | "donating-mon">("idle");
+  const savedTxRef = useRef<string | null>(null);
 
   const {
     writeContract: writeFaucet,
@@ -44,6 +51,16 @@ export function DonationPanel({
   });
 
   const {
+    writeContract: writeApprove,
+    data: approveHash,
+    isPending: approvePending,
+  } = useWriteContract();
+
+  const { isSuccess: approveConfirmed } = useWaitForTransactionReceipt({
+    hash: approveHash,
+  });
+
+  const {
     writeContract: writeDonation,
     data: donationHash,
     isPending: donationPending,
@@ -52,6 +69,48 @@ export function DonationPanel({
   const { isSuccess: donationConfirmed } = useWaitForTransactionReceipt({
     hash: donationHash,
   });
+
+  // Step 2 of mUSDC: after approve confirmed, send donation
+  useEffect(() => {
+    if (approveConfirmed && step === "approving") {
+      setStep("donating-musdc");
+      writeDonation({
+        address: ACIKKASA_VAULT_ADDRESS,
+        abi: ACIKKASA_VAULT_ABI,
+        functionName: "donateWithMUSDC",
+        args: [BigInt(campaignId), parseUnits(musdcAmount, 6)],
+      });
+    }
+  }, [approveConfirmed, step]);
+
+  // Save tx to Supabase after donation confirmed
+  useEffect(() => {
+    if (donationConfirmed && donationHash && address && donationHash !== savedTxRef.current) {
+      savedTxRef.current = donationHash;
+
+      const token = step === "donating-musdc" ? "MUSDC" : "MON";
+      const amount = step === "donating-musdc" ? parseFloat(musdcAmount) : parseFloat(monAmount);
+
+      saveTxToSupabase(donationHash, token, amount);
+      setStep("idle");
+      onDonationSuccess?.();
+    }
+  }, [donationConfirmed, donationHash]);
+
+  async function saveTxToSupabase(txHash: string, token: string, amount: number) {
+    if (!address) return;
+    await supabase.from("transactions").insert({
+      campaign_id: campaignDbId || null,
+      chain_campaign_id: campaignId,
+      tx_hash: txHash,
+      type: "donation",
+      token,
+      amount,
+      from_address: address,
+      to_address: ACIKKASA_VAULT_ADDRESS,
+      explorer_url: `https://testnet.monadscan.com/tx/${txHash}`,
+    });
+  }
 
   const handleFaucet = () => {
     if (!isConnected) {
@@ -76,6 +135,7 @@ export function DonationPanel({
       return;
     }
     setError(null);
+    setStep("donating-mon");
     writeDonation({
       address: ACIKKASA_VAULT_ADDRESS,
       abi: ACIKKASA_VAULT_ABI,
@@ -95,17 +155,18 @@ export function DonationPanel({
       return;
     }
     setError(null);
-    writeDonation({
-      address: ACIKKASA_VAULT_ADDRESS,
-      abi: ACIKKASA_VAULT_ABI,
-      functionName: "donateWithMUSDC",
-      args: [BigInt(campaignId), parseUnits(musdcAmount, 6)],
+    setStep("approving");
+    writeApprove({
+      address: MOCK_USDC_ADDRESS,
+      abi: MOCK_USDC_ABI,
+      functionName: "approve",
+      args: [ACIKKASA_VAULT_ADDRESS, parseUnits(musdcAmount, 6)],
     });
   };
 
-  const progress = Math.round((collectedMUSDC / targetMUSDC) * 100);
-  const txHash = donationHash || faucetHash;
-  const isPending = donationPending || faucetPending;
+  const rawPct = targetMUSDC > 0 ? (collectedMUSDC / targetMUSDC) * 100 : 0;
+  const progress = rawPct > 0 && rawPct < 1 ? 1 : Math.min(Math.round(rawPct), 100);
+  const isPending = donationPending || faucetPending || approvePending;
 
   return (
     <Card className="sticky top-24">
@@ -144,7 +205,7 @@ export function DonationPanel({
                 disabled={isPending}
                 className="shrink-0"
               >
-                {donationPending ? "İşleniyor..." : "Bağışla"}
+                {donationPending && step === "donating-mon" ? "İşleniyor..." : "Bağışla"}
               </Button>
             </div>
           </div>
@@ -174,9 +235,19 @@ export function DonationPanel({
                 disabled={isPending}
                 className="shrink-0"
               >
-                {donationPending ? "İşleniyor..." : "Bağışla"}
+                {approvePending ? "Onay..." : donationPending && step === "donating-musdc" ? "Bağış..." : "Bağışla"}
               </Button>
             </div>
+            {step === "approving" && (
+              <p className="text-xs text-muted-foreground mt-1">
+                Adım 1/2: Token onayı bekleniyor...
+              </p>
+            )}
+            {step === "donating-musdc" && (
+              <p className="text-xs text-muted-foreground mt-1">
+                Adım 2/2: Bağış işlemi gönderiliyor...
+              </p>
+            )}
           </div>
         </div>
 
@@ -187,13 +258,13 @@ export function DonationPanel({
           disabled={faucetPending}
         >
           <Zap className="h-4 w-4" />
-          {faucetPending ? "Talep ediliyor..." : faucetConfirmed ? "1000 mUSDC alındı ✓" : "Test mUSDC Al"}
+          {faucetPending ? "Talep ediliyor..." : faucetConfirmed ? "1000 mUSDC alındı!" : "Test mUSDC Al"}
         </Button>
 
         <Alert variant="warning" className="bg-warning/10 border-warning/20">
           <AlertTriangle className="h-4 w-4" />
           <AlertDescription className="text-sm">
-            Kampanya hedefe ulaşmazsa bağışlar AçıkKasa Genel Yardım Kasası&apos;na aktarılır.
+            Kampanya hedefe ulaşmazsa bağışlar Mon Bağış Genel Yardım Kasası&apos;na aktarılır.
           </AlertDescription>
         </Alert>
 

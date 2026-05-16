@@ -9,7 +9,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Wallet, ChevronDown, LogOut, Copy, Check } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { formatAddress } from "@/lib/utils";
 
 export function WalletConnect() {
@@ -17,6 +17,20 @@ export function WalletConnect() {
   const { connect, connectors } = useConnect();
   const { disconnect } = useDisconnect();
   const [copied, setCopied] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!mounted) {
+    return (
+      <Button className="gap-2">
+        <Wallet className="h-4 w-4" />
+        Cüzdan Bağla
+      </Button>
+    );
+  }
 
   const handleCopyAddress = () => {
     if (address) {

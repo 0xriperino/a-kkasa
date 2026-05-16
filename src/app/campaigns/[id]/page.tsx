@@ -1,6 +1,7 @@
 "use client";
 
-import { useParams, notFound } from "next/navigation";
+import { useParams } from "next/navigation";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import {
   MapPin,
@@ -9,39 +10,148 @@ import {
   BadgeCheck,
   Clock,
   FileText,
+  ArrowLeft,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { DonationPanel } from "@/components/campaigns/DonationPanel";
 import { TransactionHistory } from "@/components/campaigns/TransactionHistory";
-import { mockCampaigns, mockTransactions } from "@/data/mockData";
+import { supabase } from "@/../lib/supabase/client";
 import { CATEGORY_LABELS, STATUS_LABELS } from "@/types";
+import type { Campaign, CampaignCategory, Transaction } from "@/types";
 import { calculateProgress, formatDate } from "@/lib/utils";
 import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
 
 function getDaysLeft(deadline: string): number {
   return Math.max(
     0,
     Math.ceil(
-      (new Date(deadline).getTime() - new Date("2026-05-16").getTime()) / (1000 * 60 * 60 * 24)
+      (new Date(deadline).getTime() - Date.now()) / (1000 * 60 * 60 * 24)
     )
   );
+}
+
+function mapDbCampaign(row: Record<string, unknown>): Campaign {
+  return {
+    id: row.id as string,
+    title: row.title as string,
+    description: row.description as string,
+    category: (row.category as string).toLowerCase().replace(/\s+/g, "-") as CampaignCategory,
+    province: row.city as string,
+    district: row.district as string,
+    campaignType: (row.campaign_type as string) === "Kurumsal" ? "institutional" : "individual",
+    officialReference: row.official_reference_no as string,
+    targetMUSDC: Number(row.target_musdc),
+    collectedMUSDC: 0,
+    collectedMON: 0,
+    deadline: row.deadline as string,
+    status: row.status as Campaign["status"],
+    verified: true,
+    creatorWallet: row.creator_address as string,
+    recipientWallet: row.recipient_address as string,
+    createdAt: row.created_at as string,
+    transactions: [],
+  };
+}
+
+function mapDbTransaction(row: Record<string, unknown>): Transaction {
+  return {
+    id: row.id as string,
+    campaignId: row.campaign_id as string,
+    campaignTitle: "",
+    type: row.type as Transaction["type"],
+    token: row.token as "MUSDC" | "MON",
+    amount: Number(row.amount),
+    sender: row.from_address as string,
+    receiver: row.to_address as string,
+    txHash: row.tx_hash as string,
+    timestamp: row.created_at as string,
+    status: "confirmed",
+  };
 }
 
 export default function CampaignDetailPage() {
   const params = useParams();
   const campaignId = params.id as string;
-  const campaign = mockCampaigns.find((c) => c.id === campaignId);
+  const [campaign, setCampaign] = useState<Campaign | null>(null);
+  const [chainCampaignId, setChainCampaignId] = useState<number>(0);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [notFound, setNotFound] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
 
-  if (!campaign) {
-    notFound();
+  useEffect(() => {
+    async function fetchCampaign() {
+      const { data, error } = await supabase
+        .from("campaigns")
+        .select("*")
+        .eq("id", campaignId)
+        .single();
+
+      if (error || !data) {
+        setNotFound(true);
+        setLoading(false);
+        return;
+      }
+
+      setChainCampaignId(Number(data.chain_campaign_id) || 0);
+
+      const { data: txData } = await supabase
+        .from("transactions")
+        .select("*")
+        .eq("campaign_id", campaignId)
+        .order("created_at", { ascending: false });
+
+      const txList = txData ? txData.map(mapDbTransaction) : [];
+      setTransactions(txList);
+
+      const collectedMUSDC = txList
+        .filter((tx) => tx.token === "MUSDC" && tx.type === "donation")
+        .reduce((sum, tx) => sum + tx.amount, 0);
+      const collectedMON = txList
+        .filter((tx) => tx.token === "MON" && tx.type === "donation")
+        .reduce((sum, tx) => sum + tx.amount, 0);
+
+      const mapped = mapDbCampaign(data);
+      mapped.collectedMUSDC = collectedMUSDC;
+      mapped.collectedMON = collectedMON;
+      setCampaign(mapped);
+
+      setLoading(false);
+    }
+    fetchCampaign();
+  }, [campaignId, refreshKey]);
+
+  const handleDonationSuccess = () => {
+    setTimeout(() => setRefreshKey((k) => k + 1), 2000);
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-muted-foreground">Kampanya yükleniyor...</p>
+        </div>
+      </div>
+    );
   }
 
-  const campaignTransactions = mockTransactions.filter(
-    (tx) => tx.campaignId === campaignId
-  );
+  if (notFound || !campaign) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold mb-2">Kampanya Bulunamadı</h1>
+          <p className="text-muted-foreground mb-4">Bu kampanya mevcut değil veya kaldırılmış.</p>
+          <Link href="/campaigns" className="text-primary hover:underline">
+            Kampanyalara Dön
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
   const progress = calculateProgress(campaign.collectedMUSDC, campaign.targetMUSDC);
   const daysLeft = getDaysLeft(campaign.deadline);
 
@@ -64,7 +174,7 @@ export default function CampaignDetailPage() {
           >
             <div className="flex-1">
               <div className="flex items-center gap-2 mb-4">
-                <Badge variant="muted">{CATEGORY_LABELS[campaign.category]}</Badge>
+                <Badge variant="muted">{CATEGORY_LABELS[campaign.category] || campaign.category}</Badge>
                 {campaign.verified && (
                   <Badge variant="success" className="gap-1">
                     <BadgeCheck className="h-3 w-3" />
@@ -175,17 +285,17 @@ export default function CampaignDetailPage() {
                   </div>
                   <div className="p-4 rounded-lg bg-secondary/30">
                     <p className="text-sm text-muted-foreground mb-1">Oluşturan Cüzdan</p>
-                    <p className="font-mono text-sm">{campaign.creatorWallet}</p>
+                    <p className="font-mono text-sm break-all">{campaign.creatorWallet}</p>
                   </div>
                   <div className="p-4 rounded-lg bg-secondary/30">
                     <p className="text-sm text-muted-foreground mb-1">Alıcı Cüzdan</p>
-                    <p className="font-mono text-sm">{campaign.recipientWallet}</p>
+                    <p className="font-mono text-sm break-all">{campaign.recipientWallet}</p>
                   </div>
                 </div>
               </div>
 
               <div className="mt-8">
-                <TransactionHistory transactions={campaignTransactions} />
+                <TransactionHistory transactions={transactions} />
               </div>
             </div>
 
@@ -193,6 +303,9 @@ export default function CampaignDetailPage() {
               <DonationPanel
                 targetMUSDC={campaign.targetMUSDC}
                 collectedMUSDC={campaign.collectedMUSDC}
+                campaignId={chainCampaignId}
+                campaignDbId={campaignId}
+                onDonationSuccess={handleDonationSuccess}
               />
             </div>
           </motion.div>

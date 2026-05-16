@@ -4,7 +4,6 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { motion } from "framer-motion";
 import {
-  Heart,
   Menu,
   X,
   Home,
@@ -15,32 +14,43 @@ import {
   PlusCircle,
 } from "lucide-react";
 import { useState } from "react";
+import { useAccount } from "wagmi";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { ThemeToggle } from "./ThemeToggle";
+import { WalletConnect } from "@/components/web3/WalletConnect";
 
-const navLinks = [
+const ADMIN_WALLET = process.env.NEXT_PUBLIC_ADMIN_WALLET?.toLowerCase();
+
+const publicNavLinks = [
   { href: "/", label: "Ana Sayfa", icon: Home },
   { href: "/campaigns", label: "Kampanyalar", icon: Users },
   { href: "/general-vault", label: "Genel Kasa", icon: Wallet },
   { href: "/transparency", label: "Şeffaflık", icon: BarChart3 },
-  { href: "/admin", label: "Yönetim", icon: Shield },
 ];
 
 export function Header() {
   const pathname = usePathname();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const { address } = useAccount();
+  const isAdmin = address?.toLowerCase() === ADMIN_WALLET;
+
+  const navLinks = isAdmin
+    ? [...publicNavLinks, { href: "/admin", label: "Yönetim", icon: Shield }]
+    : publicNavLinks;
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border/50 bg-background/80 backdrop-blur-lg">
       <div className="container mx-auto px-4">
         <div className="flex h-16 items-center justify-between">
           <Link href="/" className="flex items-center gap-2 group">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary shadow-md group-hover:shadow-lg group-hover:scale-105 transition-all duration-200">
-              <Heart className="h-5 w-5 text-primary-foreground" />
-            </div>
+            <img
+              src="/logo.svg"
+              alt="Mon Bağış"
+              className="h-10 w-10 group-hover:scale-105 transition-transform duration-200"
+            />
             <span className="text-xl font-bold tracking-tight text-foreground">
-              AçıkKasa
+              Mon Bağış
             </span>
           </Link>
 
@@ -76,13 +86,9 @@ export function Header() {
               </Button>
             </Link>
 
-            <Button
-              variant="outline"
-              size="sm"
-              className="hidden md:flex"
-            >
-              Cüzdan Bağla
-            </Button>
+            <div className="hidden md:block">
+              <WalletConnect />
+            </div>
 
             <button
               className="md:hidden p-2 rounded-lg hover:bg-accent transition-colors"
@@ -134,6 +140,9 @@ export function Header() {
                 Kampanya Oluştur
               </Button>
             </Link>
+            <div className="mt-2">
+              <WalletConnect />
+            </div>
           </nav>
         </motion.div>
       )}

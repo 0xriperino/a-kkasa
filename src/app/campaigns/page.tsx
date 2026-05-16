@@ -1,12 +1,12 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Users, TrendingUp } from "lucide-react";
 import { CampaignCard } from "@/components/campaigns/CampaignCard";
 import { CampaignFilters } from "@/components/campaigns/CampaignFilters";
-import { mockCampaigns } from "@/data/mockData";
-import type { CampaignCategory } from "@/types";
+import { supabase } from "@/../lib/supabase/client";
+import type { Campaign, CampaignCategory } from "@/types";
 
 interface FilterState {
   search: string;
@@ -16,7 +16,32 @@ interface FilterState {
   verified: "all" | "verified" | "pending";
 }
 
+function mapDbCampaign(row: Record<string, unknown>): Campaign {
+  return {
+    id: row.id as string,
+    title: row.title as string,
+    description: row.description as string,
+    category: (row.category as string).toLowerCase().replace(/\s+/g, "-") as CampaignCategory,
+    province: row.city as string,
+    district: row.district as string,
+    campaignType: (row.campaign_type as string) === "Kurumsal" ? "institutional" : "individual",
+    officialReference: row.official_reference_no as string,
+    targetMUSDC: Number(row.target_musdc),
+    collectedMUSDC: 0,
+    collectedMON: 0,
+    deadline: row.deadline as string,
+    status: row.status as Campaign["status"],
+    verified: true,
+    creatorWallet: row.creator_address as string,
+    recipientWallet: row.recipient_address as string,
+    createdAt: row.created_at as string,
+    transactions: [],
+  };
+}
+
 export default function CampaignsPage() {
+  const [campaigns, setCampaigns] = useState<Campaign[]>([]);
+  const [loading, setLoading] = useState(true);
   const [filters, setFilters] = useState<FilterState>({
     search: "",
     category: "all",
@@ -25,16 +50,63 @@ export default function CampaignsPage() {
     verified: "all",
   });
 
-  const uniqueCategories = useMemo(() => {
-    return [...new Set(mockCampaigns.map((c) => c.category))];
+  useEffect(() => {
+    async function fetchCampaigns() {
+      const { data, error } = await supabase
+        .from("campaigns")
+        .select("*")
+        .order("created_at", { ascending: false });
+
+      if (error) {
+        console.error("Kampanyalar yüklenemedi:", error);
+        setCampaigns([]);
+        setLoading(false);
+        return;
+      }
+
+      const campaignList = (data || []).map(mapDbCampaign);
+
+      const { data: txData } = await supabase
+        .from("transactions")
+        .select("campaign_id, token, amount")
+        .eq("type", "donation");
+
+      if (txData) {
+        const musdcByCampaign: Record<string, number> = {};
+        const monByCampaign: Record<string, number> = {};
+
+        for (const tx of txData) {
+          const cid = tx.campaign_id as string;
+          if (!cid) continue;
+          if (tx.token === "MUSDC") {
+            musdcByCampaign[cid] = (musdcByCampaign[cid] || 0) + Number(tx.amount);
+          } else if (tx.token === "MON") {
+            monByCampaign[cid] = (monByCampaign[cid] || 0) + Number(tx.amount);
+          }
+        }
+
+        for (const c of campaignList) {
+          c.collectedMUSDC = musdcByCampaign[c.id] || 0;
+          c.collectedMON = monByCampaign[c.id] || 0;
+        }
+      }
+
+      setCampaigns(campaignList);
+      setLoading(false);
+    }
+    fetchCampaigns();
   }, []);
+
+  const uniqueCategories = useMemo(() => {
+    return [...new Set(campaigns.map((c) => c.category))];
+  }, [campaigns]);
 
   const uniqueProvinces = useMemo(() => {
-    return [...new Set(mockCampaigns.map((c) => c.province))].sort();
-  }, []);
+    return [...new Set(campaigns.map((c) => c.province))].sort();
+  }, [campaigns]);
 
   const filteredCampaigns = useMemo(() => {
-    return mockCampaigns.filter((campaign) => {
+    return campaigns.filter((campaign) => {
       if (
         filters.search &&
         !campaign.title.toLowerCase().includes(filters.search.toLowerCase()) &&
@@ -62,14 +134,25 @@ export default function CampaignsPage() {
       }
       return true;
     });
-  }, [filters]);
+  }, [filters, campaigns]);
 
-  const totalCollected = mockCampaigns.reduce(
+  const totalCollected = campaigns.reduce(
     (sum, c) => sum + c.collectedMUSDC,
     0
   );
-  const totalTarget = mockCampaigns.reduce((sum, c) => sum + c.targetMUSDC, 0);
-  const overallProgress = Math.round((totalCollected / totalTarget) * 100);
+  const totalTarget = campaigns.reduce((sum, c) => sum + c.targetMUSDC, 0);
+  const overallProgress = totalTarget > 0 ? Math.round((totalCollected / totalTarget) * 100) : 0;
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-muted-foreground">Kampanyalar yükleniyor...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen">
@@ -92,7 +175,7 @@ export default function CampaignsPage() {
                   <Users className="h-6 w-6 text-primary" />
                 </div>
                 <div>
-                  <p className="text-2xl font-bold">{mockCampaigns.length}</p>
+                  <p className="text-2xl font-bold">{campaigns.length}</p>
                   <p className="text-xs text-muted-foreground">Aktif Kampanya</p>
                 </div>
               </div>

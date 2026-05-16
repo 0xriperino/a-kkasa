@@ -139,7 +139,7 @@ export default function GeneralVaultPage() {
             <Alert className="bg-secondary/30 border-secondary">
               <Info className="h-4 w-4" />
               <AlertDescription className="text-sm">
-                <strong>Hedefe ulaşmayan kampanyalardaki bağışlar kaybolmaz.</strong> AçıkKasa Genel Yardım Kasası&apos;na aktarılır ve bağışçılar bu fonun hangi doğrulanmış kampanyaya aktarılacağına oy verir.
+                <strong>Hedefe ulaşmayan kampanyalardaki bağışlar kaybolmaz.</strong> Mon Bağış Genel Yardım Kasası&apos;na aktarılır ve bağışçılar bu fonun hangi doğrulanmış kampanyaya aktarılacağına oy verir.
               </AlertDescription>
             </Alert>
           </motion.div>

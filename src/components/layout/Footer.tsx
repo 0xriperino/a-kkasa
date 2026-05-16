@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { Heart } from "lucide-react";
 
 const footerLinks = [
   {
@@ -38,10 +37,8 @@ export function Footer() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-8">
           <div className="lg:col-span-2">
             <Link href="/" className="flex items-center gap-2 mb-4">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary shadow-md">
-                <Heart className="h-5 w-5 text-primary-foreground" />
-              </div>
-              <span className="text-xl font-bold tracking-tight">AçıkKasa</span>
+              <img src="/logo.svg" alt="Mon Bağış" className="h-10 w-10" />
+              <span className="text-xl font-bold tracking-tight">Mon Bağış</span>
             </Link>
             <p className="text-sm text-muted-foreground max-w-sm mb-6">
               Afet ve acil ihtiyaç bağışlarını Monad üzerinde izlenebilir,
@@ -96,7 +93,7 @@ export function Footer() {
 
         <div className="mt-12 pt-8 border-t border-border/50 flex flex-col md:flex-row justify-between items-center gap-4">
           <p className="text-sm text-muted-foreground">
-            © 2026 AçıkKasa. Tüm hakları saklıdır.
+            © 2026 Mon Bağış. Tüm hakları saklıdır.
           </p>
           <p className="text-sm text-muted-foreground">
             Monad Testnet üzerinde inşa edilmiştir.

@@ -31,5 +31,7 @@ export function formatExplorerUrl(hash: string, network: string = "monad"): stri
 
 export function calculateProgress(collected: number, target: number): number {
   if (target === 0) return 0;
-  return Math.min(Math.round((collected / target) * 100), 100);
+  const pct = (collected / target) * 100;
+  if (pct > 0 && pct < 1) return 1;
+  return Math.min(Math.round(pct), 100);
 }

@@ -4,8 +4,26 @@ import { motion } from "framer-motion";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { ArrowRight, Zap, Shield, Eye, Globe } from "lucide-react";
+import { useAccount, useWriteContract, useWaitForTransactionReceipt } from "wagmi";
+import { MOCK_USDC_ADDRESS, MOCK_USDC_ABI } from "@/lib/contracts";
 
 export function HeroSection() {
+  const { isConnected } = useAccount();
+  const { writeContract, data: faucetHash, isPending: faucetPending } = useWriteContract();
+  const { isLoading: faucetConfirming, isSuccess: faucetSuccess } = useWaitForTransactionReceipt({ hash: faucetHash });
+
+  const handleFaucet = () => {
+    if (!isConnected) {
+      alert("Önce cüzdanınızı bağlayın!");
+      return;
+    }
+    writeContract({
+      address: MOCK_USDC_ADDRESS,
+      abi: MOCK_USDC_ABI,
+      functionName: "faucet",
+    });
+  };
+
   return (
     <section className="relative min-h-[90vh] flex items-center justify-center overflow-hidden">
       <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-secondary/20" />
@@ -31,9 +49,9 @@ export function HeroSection() {
             transition={{ duration: 0.5, delay: 0.1 }}
             className="text-4xl md:text-6xl lg:text-7xl font-bold tracking-tight mb-6"
           >
-            <span className="text-foreground">Afet bağışları</span>
+            <span className="text-foreground">Yardımlarda güven,</span>
             <br />
-            <span className="text-primary">artık kara kutu değil.</span>
+            <span className="text-primary">şeffaflıkla başlar.</span>
           </motion.h1>
 
           <motion.p
@@ -42,9 +60,8 @@ export function HeroSection() {
             transition={{ duration: 0.5, delay: 0.2 }}
             className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto mb-10"
           >
-            AçıkKasa, afet ve acil ihtiyaç bağışlarını Monad üzerinde
-            izlenebilir, şeffaf ve güvenli hale getirir. Her kuruşun
-            nerede olduğunu anında görün.
+            Mon Bağış, afet ve acil ihtiyaç bağışlarını Monad üzerinde
+            izlenebilir hale getirir. Bağış yapın, fon hareketlerini anlık takip edin.
           </motion.p>
 
           <motion.div
@@ -59,12 +76,16 @@ export function HeroSection() {
                 <ArrowRight className="h-5 w-5" />
               </Button>
             </Link>
-            <Link href="/campaigns">
-              <Button size="lg" variant="outline" className="gap-2 text-base px-8">
-                <Zap className="h-5 w-5" />
-                Test mUSDC Al
-              </Button>
-            </Link>
+            <Button
+              size="lg"
+              variant="outline"
+              className="gap-2 text-base px-8"
+              onClick={handleFaucet}
+              disabled={faucetPending || faucetConfirming}
+            >
+              <Zap className="h-5 w-5" />
+              {faucetPending ? "Onay Bekleniyor..." : faucetConfirming ? "İşleniyor..." : faucetSuccess ? "1000 mUSDC Alındı!" : "Test mUSDC Al"}
+            </Button>
           </motion.div>
         </div>
 
@@ -149,7 +170,7 @@ export function ProblemSolutionSection() {
             </h2>
             <p className="text-lg text-muted-foreground mb-8">
               Geleneksel bağış sistemlerinde, bağışlarınızın hedefe ulaşıp ulaşmadığını takip etmek
-              neredeyse imkansızdı. AçıkKasa bu sorunu çözüyor.
+              neredeyse imkansızdı. Mon Bağış bu sorunu çözüyor.
             </p>
             <div className="bg-destructive/10 border border-destructive/20 rounded-xl p-6">
               <p className="text-destructive font-medium">
@@ -170,7 +191,7 @@ export function ProblemSolutionSection() {
           >
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-success/10 text-success text-sm font-medium mb-6">
               <Shield className="h-4 w-4" />
-              AçıkKasa Çözümü
+              Mon Bağış Çözümü
             </div>
             <h3 className="text-2xl font-bold mb-6">
               Her bağış ve fon hareketi zincirde takip edilebilir
@@ -207,7 +228,7 @@ export function HowItWorksSection() {
         >
           <h2 className="text-3xl md:text-4xl font-bold mb-4">Nasıl Çalışır?</h2>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-            AçıkKasa, bağış sürecini şeffaf ve güvenli hale getirmek için akıllı sözleşmeler kullanır
+            Mon Bağış, bağış sürecini şeffaf ve güvenli hale getirmek için akıllı sözleşmeler kullanır
           </p>
         </motion.div>
 
@@ -251,7 +272,7 @@ export function TrustLayerSection() {
             <Shield className="h-4 w-4" />
             Güven Katmanı
           </div>
-          <h2 className="text-3xl md:text-4xl font-bold mb-4">Neden AçıkKasa?</h2>
+          <h2 className="text-3xl md:text-4xl font-bold mb-4">Neden Mon Bağış?</h2>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
             Kurumsal doğrulama, şeffaf işlem geçmişi ve güvenli akıllı sözleşmeler ile bağışlarınız güvende
           </p>
@@ -381,7 +402,7 @@ export function CTASection() {
             Şeffaf Bağış Yapmaya Bugün Başlayın
           </h2>
           <p className="text-lg opacity-90 max-w-2xl mx-auto mb-8">
-            AçıkKasa ile bağışlarınızın her kuruşunu takip edin. Hemen bir kampanyaya destek olun.
+            Mon Bağış ile bağışlarınızın her kuruşunu takip edin. Hemen bir kampanyaya destek olun.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Link href="/campaigns">

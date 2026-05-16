@@ -11,10 +11,10 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "AçıkKasa | Afet Bağışlarında Şeffaflık",
-  description: "AçıkKasa, afet ve acil ihtiyaç bağışlarını Monad üzerinde izlenebilir, şeffaf ve güvenli hale getirir.",
+  title: "Mon Bağış | Bağışlarda Şeffaflık",
+  description: "Mon Bağış, afet ve acil ihtiyaç bağışlarını Monad üzerinde izlenebilir hale getirir. Bağış yapın, fon hareketlerini anlık takip edin.",
   icons: {
-    icon: "/favicon.ico",
+    icon: "/logo.svg",
   },
 };
 
