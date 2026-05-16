@@ -26,10 +26,7 @@ export function formatDate(date: Date | string): string {
 }
 
 export function formatExplorerUrl(hash: string, network: string = "monad"): string {
-  if (network === "monad") {
-    return `https://testnet.monadelabs.io/tx/${hash}`;
-  }
-  return `https://testnet.monadelabs.io/tx/${hash}`;
+  return `https://testnet.monadscan.com/tx/${hash}`;
 }
 
 export function calculateProgress(collected: number, target: number): number {

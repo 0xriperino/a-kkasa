@@ -288,7 +288,7 @@ export default function GeneralVaultPage() {
                         İşlem Hash: {txHash}
                       </p>
                       <a
-                        href={`https://testnet.monadelabs.io/tx/${txHash}`}
+                        href={`https://testnet.monadscan.com/tx/${txHash}`}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="text-xs text-primary hover:underline"

@@ -23,6 +23,8 @@ export function DonationPanel({
   const [isPending, setIsPending] = useState(false);
   const [txHash, setTxHash] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [faucetPending, setFaucetPending] = useState(false);
+  const [faucetSuccess, setFaucetSuccess] = useState(false);
 
   const handleMONDonation = async () => {
     if (!monAmount || parseFloat(monAmount) <= 0) {
@@ -53,6 +55,16 @@ export function DonationPanel({
       setIsPending(false);
       setTxHash("0x" + Math.random().toString(16).slice(2) + "..." + Math.random().toString(16).slice(2));
     }, 2000);
+  };
+
+  const handleFaucet = async () => {
+    setFaucetPending(true);
+    setFaucetSuccess(false);
+    setTimeout(() => {
+      setFaucetPending(false);
+      setFaucetSuccess(true);
+      setTimeout(() => setFaucetSuccess(false), 3000);
+    }, 1500);
   };
 
   const progress = Math.round((collectedMUSDC / targetMUSDC) * 100);
@@ -130,9 +142,14 @@ export function DonationPanel({
           </div>
         </div>
 
-        <Button variant="outline" className="w-full gap-2" onClick={() => {}}>
+        <Button
+          variant="outline"
+          className="w-full gap-2"
+          onClick={handleFaucet}
+          disabled={faucetPending}
+        >
           <Zap className="h-4 w-4" />
-          Test mUSDC Al
+          {faucetPending ? "Talep ediliyor..." : faucetSuccess ? "1000 mUSDC alındı ✓" : "Test mUSDC Al"}
         </Button>
 
         <Alert variant="warning" className="bg-warning/10 border-warning/20">
@@ -153,7 +170,7 @@ export function DonationPanel({
               İşlem Hash: {txHash}
             </p>
             <a
-              href={`https://testnet.monadelabs.io/tx/${txHash}`}
+              href={`https://testnet.monadscan.com/tx/${txHash}`}
               target="_blank"
               rel="noopener noreferrer"
               className="text-xs text-primary hover:underline"

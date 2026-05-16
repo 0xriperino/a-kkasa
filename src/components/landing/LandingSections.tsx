@@ -59,10 +59,12 @@ export function HeroSection() {
                 <ArrowRight className="h-5 w-5" />
               </Button>
             </Link>
-            <Button size="lg" variant="outline" className="gap-2 text-base px-8">
-              <Zap className="h-5 w-5" />
-              Test mUSDC Al
-            </Button>
+            <Link href="/campaigns">
+              <Button size="lg" variant="outline" className="gap-2 text-base px-8">
+                <Zap className="h-5 w-5" />
+                Test mUSDC Al
+              </Button>
+            </Link>
           </motion.div>
         </div>
 

@@ -87,7 +87,7 @@ export function TransactionHistory({ transactions }: TransactionHistoryProps) {
                     {formatAddress(tx.sender)}
                   </p>
                   <a
-                    href={`https://testnet.monadelabs.io/tx/${tx.txHash}`}
+                    href={`https://testnet.monadscan.com/tx/${tx.txHash}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
