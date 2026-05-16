@@ -8,66 +8,104 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { useWriteContract, useWaitForTransactionReceipt, useAccount } from "wagmi";
+import { parseEther, parseUnits } from "viem";
+import {
+  MOCK_USDC_ADDRESS,
+  MOCK_USDC_ABI,
+  ACIKKASA_VAULT_ADDRESS,
+  ACIKKASA_VAULT_ABI,
+} from "@/lib/contracts";
 
 interface DonationPanelProps {
   targetMUSDC: number;
   collectedMUSDC: number;
+  campaignId?: number;
 }
 
 export function DonationPanel({
   targetMUSDC,
   collectedMUSDC,
+  campaignId = 0,
 }: DonationPanelProps) {
+  const { isConnected } = useAccount();
   const [monAmount, setMonAmount] = useState("");
   const [musdcAmount, setMusdcAmount] = useState("");
-  const [isPending, setIsPending] = useState(false);
-  const [txHash, setTxHash] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [faucetPending, setFaucetPending] = useState(false);
-  const [faucetSuccess, setFaucetSuccess] = useState(false);
 
-  const handleMONDonation = async () => {
+  const {
+    writeContract: writeFaucet,
+    data: faucetHash,
+    isPending: faucetPending,
+  } = useWriteContract();
+
+  const { isSuccess: faucetConfirmed } = useWaitForTransactionReceipt({
+    hash: faucetHash,
+  });
+
+  const {
+    writeContract: writeDonation,
+    data: donationHash,
+    isPending: donationPending,
+  } = useWriteContract();
+
+  const { isSuccess: donationConfirmed } = useWaitForTransactionReceipt({
+    hash: donationHash,
+  });
+
+  const handleFaucet = () => {
+    if (!isConnected) {
+      setError("Lütfen önce cüzdanınızı bağlayın.");
+      return;
+    }
+    setError(null);
+    writeFaucet({
+      address: MOCK_USDC_ADDRESS,
+      abi: MOCK_USDC_ABI,
+      functionName: "faucet",
+    });
+  };
+
+  const handleMONDonation = () => {
+    if (!isConnected) {
+      setError("Lütfen önce cüzdanınızı bağlayın.");
+      return;
+    }
     if (!monAmount || parseFloat(monAmount) <= 0) {
       setError("Geçerli bir MON miktarı girin.");
       return;
     }
-    setIsPending(true);
     setError(null);
-    setTxHash(null);
-    // TODO: Connect to contract donateWithMON(campaignId)
-    // Simulating transaction
-    setTimeout(() => {
-      setIsPending(false);
-      setTxHash("0x" + Math.random().toString(16).slice(2) + "..." + Math.random().toString(16).slice(2));
-    }, 2000);
+    writeDonation({
+      address: ACIKKASA_VAULT_ADDRESS,
+      abi: ACIKKASA_VAULT_ABI,
+      functionName: "donateWithMON",
+      args: [BigInt(campaignId)],
+      value: parseEther(monAmount),
+    });
   };
 
-  const handleMUSDCDonation = async () => {
+  const handleMUSDCDonation = () => {
+    if (!isConnected) {
+      setError("Lütfen önce cüzdanınızı bağlayın.");
+      return;
+    }
     if (!musdcAmount || parseFloat(musdcAmount) <= 0) {
       setError("Geçerli bir mUSDC miktarı girin.");
       return;
     }
-    setIsPending(true);
     setError(null);
-    setTxHash(null);
-    // TODO: Connect to MockUSDC approve first, then donateWithMUSDC(campaignId, amount)
-    setTimeout(() => {
-      setIsPending(false);
-      setTxHash("0x" + Math.random().toString(16).slice(2) + "..." + Math.random().toString(16).slice(2));
-    }, 2000);
-  };
-
-  const handleFaucet = async () => {
-    setFaucetPending(true);
-    setFaucetSuccess(false);
-    setTimeout(() => {
-      setFaucetPending(false);
-      setFaucetSuccess(true);
-      setTimeout(() => setFaucetSuccess(false), 3000);
-    }, 1500);
+    writeDonation({
+      address: ACIKKASA_VAULT_ADDRESS,
+      abi: ACIKKASA_VAULT_ABI,
+      functionName: "donateWithMUSDC",
+      args: [BigInt(campaignId), parseUnits(musdcAmount, 6)],
+    });
   };
 
   const progress = Math.round((collectedMUSDC / targetMUSDC) * 100);
+  const txHash = donationHash || faucetHash;
+  const isPending = donationPending || faucetPending;
 
   return (
     <Card className="sticky top-24">
@@ -106,7 +144,7 @@ export function DonationPanel({
                 disabled={isPending}
                 className="shrink-0"
               >
-                {isPending ? "İşleniyor..." : "Bağışla"}
+                {donationPending ? "İşleniyor..." : "Bağışla"}
               </Button>
             </div>
           </div>
@@ -136,7 +174,7 @@ export function DonationPanel({
                 disabled={isPending}
                 className="shrink-0"
               >
-                {isPending ? "İşleniyor..." : "Bağışla"}
+                {donationPending ? "İşleniyor..." : "Bağışla"}
               </Button>
             </div>
           </div>
@@ -149,7 +187,7 @@ export function DonationPanel({
           disabled={faucetPending}
         >
           <Zap className="h-4 w-4" />
-          {faucetPending ? "Talep ediliyor..." : faucetSuccess ? "1000 mUSDC alındı ✓" : "Test mUSDC Al"}
+          {faucetPending ? "Talep ediliyor..." : faucetConfirmed ? "1000 mUSDC alındı ✓" : "Test mUSDC Al"}
         </Button>
 
         <Alert variant="warning" className="bg-warning/10 border-warning/20">
@@ -159,7 +197,7 @@ export function DonationPanel({
           </AlertDescription>
         </Alert>
 
-        {txHash && (
+        {donationConfirmed && donationHash && (
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
@@ -167,10 +205,31 @@ export function DonationPanel({
           >
             <p className="text-sm font-medium text-success mb-2">Bağış başarılı!</p>
             <p className="text-xs text-muted-foreground break-all">
-              İşlem Hash: {txHash}
+              İşlem Hash: {donationHash}
             </p>
             <a
-              href={`https://testnet.monadscan.com/tx/${txHash}`}
+              href={`https://testnet.monadscan.com/tx/${donationHash}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs text-primary hover:underline"
+            >
+              Explorer&apos;da Görüntüle →
+            </a>
+          </motion.div>
+        )}
+
+        {faucetConfirmed && faucetHash && !donationHash && (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-success/10 border border-success/20 rounded-lg p-4"
+          >
+            <p className="text-sm font-medium text-success mb-2">1000 mUSDC cüzdanınıza eklendi!</p>
+            <p className="text-xs text-muted-foreground break-all">
+              İşlem Hash: {faucetHash}
+            </p>
+            <a
+              href={`https://testnet.monadscan.com/tx/${faucetHash}`}
               target="_blank"
               rel="noopener noreferrer"
               className="text-xs text-primary hover:underline"
